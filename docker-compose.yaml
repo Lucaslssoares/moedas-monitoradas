@@ -1,0 +1,16 @@
+services:
+
+  price-monitor:
+    build:
+      context: .
+    restart: on-failure
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    networks:
+      - projetos_shared
+
+networks:
+  projetos_shared:
+    external: true
