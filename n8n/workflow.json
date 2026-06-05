@@ -1,5 +1,5 @@
 {
-  "name": "Crypto Price Hunter — Monitor de Preços",
+  "name": "Moedas Monitoradas — Crypto Price Hunter",
   "nodes": [
     {
       "parameters": {
@@ -111,15 +111,25 @@
     },
     {
       "parameters": {
+        "jsCode": "const alerts = $json.alerts;\n\nfunction formatBRL(n) {\n  return 'R\\u00a4 ' + Number(n).toLocaleString('pt-BR', {\n    minimumFractionDigits: 2,\n    maximumFractionDigits: 2\n  });\n}\n\nconst now = new Date().toLocaleString('pt-BR', {\n  timeZone: 'America/Sao_Paulo',\n  day: '2-digit',\n  month: '2-digit',\n  year: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit'\n});\n\nconst sep = '\\u2500'.repeat(30);\n\nconst lines = alerts.map(a => {\n  const pct = Math.abs(a.variation_pct).toFixed(2).replace('.', ',');\n  return [\n    '\\uD83D\\uDD34 *' + a.title + '*',\n    '\\u2022 Anterior: ' + formatBRL(a.previous_price),\n    '\\u2022 Atual:    ' + formatBRL(a.current_price),\n    '\\u2022 Varia\\u00e7\\u00e3o: \\u25bc ' + pct + '%',\n    '\\uD83D\\uDD17 ' + a.permalink\n  ].join('\\n');\n});\n\nconst header = '\\uD83D\\uDEA8 *ALERTA DE QUEDA*\\n_Moedas Monitoradas_\\n' + sep;\nconst footer = sep + '\\n\\uD83D\\uDCC5 ' + now + ' (Bras\\u00edlia)';\n\nconst message = [header, ...lines, footer].join('\\n\\n');\n\nreturn [{ json: { message } }];"
+      },
+      "id": "node-format-alert",
+      "name": "Format Alert Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 180]
+    },
+    {
+      "parameters": {
         "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
-        "text": "={{ $json.alerts.map(a => '🔴 *' + a.title + '*\\nAntes: R$ ' + a.previous_price.toFixed(2) + ' → Agora: R$ ' + a.current_price.toFixed(2) + '\\nQueda: ' + a.variation_pct + '%\\n' + a.permalink).join('\\n\\n') }}",
+        "text": "={{ $json.message }}",
         "additionalFields": { "parse_mode": "Markdown" }
       },
       "id": "node-telegram-send",
       "name": "Send Telegram Alert",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1560, 180],
+      "position": [1780, 180],
       "credentials": {
         "telegramApi": { "id": "telegram-credentials", "name": "Telegram Bot" }
       }
@@ -134,15 +144,16 @@
     }
   ],
   "connections": {
-    "Schedule Trigger":      { "main": [[{ "node": "Set Crypto Params",       "type": "main", "index": 0 }]] },
-    "Set Crypto Params":     { "main": [[{ "node": "Fetch CoinGecko Prices",  "type": "main", "index": 0 }]] },
-    "Fetch CoinGecko Prices":{ "main": [[{ "node": "Extract Items",           "type": "main", "index": 0 }]] },
-    "Extract Items":         { "main": [[{ "node": "Analyze Prices",          "type": "main", "index": 0 }]] },
-    "Analyze Prices":        { "main": [[{ "node": "Has Alert?",              "type": "main", "index": 0 }]] },
-    "Has Alert?":            { "main": [
-      [{ "node": "Send Telegram Alert", "type": "main", "index": 0 }],
-      [{ "node": "No Operation",        "type": "main", "index": 0 }]
-    ]}
+    "Schedule Trigger":       { "main": [[{ "node": "Set Crypto Params",       "type": "main", "index": 0 }]] },
+    "Set Crypto Params":      { "main": [[{ "node": "Fetch CoinGecko Prices",  "type": "main", "index": 0 }]] },
+    "Fetch CoinGecko Prices": { "main": [[{ "node": "Extract Items",           "type": "main", "index": 0 }]] },
+    "Extract Items":          { "main": [[{ "node": "Analyze Prices",          "type": "main", "index": 0 }]] },
+    "Analyze Prices":         { "main": [[{ "node": "Has Alert?",              "type": "main", "index": 0 }]] },
+    "Has Alert?": { "main": [
+      [{ "node": "Format Alert Message", "type": "main", "index": 0 }],
+      [{ "node": "No Operation",         "type": "main", "index": 0 }]
+    ]},
+    "Format Alert Message":   { "main": [[{ "node": "Send Telegram Alert",     "type": "main", "index": 0 }]] }
   },
   "pinData": {},
   "settings": {
@@ -152,5 +163,5 @@
   "staticData": null,
   "tags": [{ "id": "tag-price-monitor", "name": "price-monitor" }],
   "triggerCount": 1,
-  "versionId": "3"
+  "versionId": "4"
 }
