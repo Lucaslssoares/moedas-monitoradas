@@ -10,11 +10,19 @@
 
 ---
 
-## 📸 Alerta em ação
+## 📸 Screenshots
+
+### Workflow no n8n
+
+![Workflow n8n](docs/n8n-workflow.png)
+
+> Pipeline completo: agendador → CoinGecko → FastAPI → alerta Telegram.
+
+### Alerta no Telegram
 
 ![Alerta Telegram](docs/telegram-alert.png)
 
-> Mensagem enviada automaticamente ao Telegram quando uma criptomoeda cai mais de 10% em relação ao último preço registrado.
+> Mensagem enviada automaticamente quando uma criptomoeda cai mais de 10% em relação ao último preço registrado.
 
 ---
 
