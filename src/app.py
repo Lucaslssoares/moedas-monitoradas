@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="ML Price Monitor", lifespan=lifespan)
+app = FastAPI(title="Moedas Monitoradas — Crypto Price Hunter", lifespan=lifespan)
 
 
 @app.get("/health")
