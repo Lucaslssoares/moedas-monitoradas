@@ -1,5 +1,5 @@
 {
-  "name": "ML Price Hunter — Monitor de Preços",
+  "name": "Crypto Price Hunter — Monitor de Preços",
   "nodes": [
     {
       "parameters": {
@@ -19,26 +19,14 @@
           "assignments": [
             {
               "id": "a1",
-              "name": "searchQuery",
-              "value": "={{ $env.ML_SEARCH_QUERY || 'rtx 4070' }}",
+              "name": "cryptoIds",
+              "value": "={{ $env.CRYPTO_IDS || 'bitcoin,ethereum,solana,cardano,chainlink' }}",
               "type": "string"
             },
             {
               "id": "a2",
               "name": "limit",
-              "value": 5,
-              "type": "number"
-            },
-            {
-              "id": "a3",
-              "name": "appId",
-              "value": "={{ $env.ML_APP_ID }}",
-              "type": "string"
-            },
-            {
-              "id": "a4",
-              "name": "appSecret",
-              "value": "={{ $env.ML_APP_SECRET }}",
+              "value": "={{ $env.CRYPTO_LIMIT || '5' }}",
               "type": "string"
             }
           ]
@@ -46,101 +34,43 @@
         "options": {}
       },
       "id": "node-set",
-      "name": "Set Search Params",
+      "name": "Set Crypto Params",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [460, 300]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.mercadolibre.com/oauth/token",
-        "sendBody": true,
-        "contentType": "form-urlencoded",
-        "bodyParameters": {
+        "method": "GET",
+        "url": "https://api.coingecko.com/api/v3/coins/markets",
+        "sendQuery": true,
+        "queryParameters": {
           "parameters": [
-            { "name": "grant_type",    "value": "client_credentials" },
-            { "name": "client_id",     "value": "={{ $json.appId }}" },
-            { "name": "client_secret", "value": "={{ $json.appSecret }}" }
+            { "name": "vs_currency", "value": "brl" },
+            { "name": "ids",         "value": "={{ $json.cryptoIds }}" },
+            { "name": "order",       "value": "market_cap_desc" },
+            { "name": "per_page",    "value": "={{ $json.limit }}" },
+            { "name": "page",        "value": "1" },
+            { "name": "sparkline",   "value": "false" }
           ]
         },
         "options": {}
       },
-      "id": "node-get-token",
-      "name": "Get ML Token",
+      "id": "node-http-coingecko",
+      "name": "Fetch CoinGecko Prices",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 300]
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "b1",
-              "name": "accessToken",
-              "value": "={{ $json.access_token }}",
-              "type": "string"
-            },
-            {
-              "id": "b2",
-              "name": "searchQuery",
-              "value": "={{ $('Set Search Params').first().json.searchQuery }}",
-              "type": "string"
-            },
-            {
-              "id": "b3",
-              "name": "limit",
-              "value": "={{ $('Set Search Params').first().json.limit }}",
-              "type": "number"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "node-set-token",
-      "name": "Store Token",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [900, 300]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "https://api.mercadolibre.com/sites/MLB/search",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $json.accessToken }}"
-            }
-          ]
-        },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "q",     "value": "={{ $json.searchQuery }}" },
-            { "name": "limit", "value": "={{ $json.limit }}" }
-          ]
-        },
-        "options": {}
-      },
-      "id": "node-http-ml-search",
-      "name": "Search MercadoLivre",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1120, 300]
-    },
-    {
-      "parameters": {
-        "jsCode": "const body = $input.first().json;\nconst rawItems = (body.results || []).slice(0, 5);\nconst items = rawItems.map(item => ({\n  id: item.id,\n  title: item.title,\n  price: item.price,\n  original_price: item.original_price || null,\n  currency_id: item.currency_id || 'BRL',\n  permalink: item.permalink,\n  seller: { id: item.seller?.id || null, nickname: item.seller?.nickname || '' }\n}));\nreturn [{ json: { items, searchQuery: $('Store Token').first().json.searchQuery } }];"
+        "jsCode": "const coins = $input.all().map(i => i.json);\nconst items = coins.map(coin => ({\n  id: coin.id,\n  title: coin.name + ' (' + coin.symbol.toUpperCase() + ')',\n  price: coin.current_price,\n  original_price: null,\n  currency_id: 'BRL',\n  permalink: 'https://www.coingecko.com/en/coins/' + coin.id,\n  seller: { id: null, nickname: coin.symbol.toUpperCase() }\n}));\nreturn [{ json: { items, query: 'crypto-brl' } }];"
       },
       "id": "node-code-extract",
       "name": "Extract Items",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1340, 300]
+      "position": [900, 300]
     },
     {
       "parameters": {
@@ -148,14 +78,14 @@
         "url": "http://price-monitor:8001/webhook/analyze",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ items: $json.items, query: $json.searchQuery }) }}",
+        "jsonBody": "={{ JSON.stringify({ items: $json.items, query: $json.query }) }}",
         "options": {}
       },
       "id": "node-http-analyze",
       "name": "Analyze Prices",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1560, 300]
+      "position": [1120, 300]
     },
     {
       "parameters": {
@@ -177,19 +107,19 @@
       "name": "Has Alert?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1780, 300]
+      "position": [1340, 300]
     },
     {
       "parameters": {
         "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
-        "text": "={{ $json.alerts.map(a => '🔴 *' + a.title + '*\\nAntes: R$ ' + a.previous_price + ' → Agora: R$ ' + a.current_price + ' (' + a.variation_pct + '%)\\n' + a.permalink).join('\\n\\n') }}",
+        "text": "={{ $json.alerts.map(a => '🔴 *' + a.title + '*\\nAntes: R$ ' + a.previous_price.toFixed(2) + ' → Agora: R$ ' + a.current_price.toFixed(2) + '\\nQueda: ' + a.variation_pct + '%\\n' + a.permalink).join('\\n\\n') }}",
         "additionalFields": { "parse_mode": "Markdown" }
       },
       "id": "node-telegram-send",
       "name": "Send Telegram Alert",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2000, 180],
+      "position": [1560, 180],
       "credentials": {
         "telegramApi": { "id": "telegram-credentials", "name": "Telegram Bot" }
       }
@@ -200,18 +130,16 @@
       "name": "No Operation",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [2000, 420]
+      "position": [1560, 420]
     }
   ],
   "connections": {
-    "Schedule Trigger":   { "main": [[{ "node": "Set Search Params",  "type": "main", "index": 0 }]] },
-    "Set Search Params":  { "main": [[{ "node": "Get ML Token",       "type": "main", "index": 0 }]] },
-    "Get ML Token":       { "main": [[{ "node": "Store Token",        "type": "main", "index": 0 }]] },
-    "Store Token":        { "main": [[{ "node": "Search MercadoLivre","type": "main", "index": 0 }]] },
-    "Search MercadoLivre":{ "main": [[{ "node": "Extract Items",      "type": "main", "index": 0 }]] },
-    "Extract Items":      { "main": [[{ "node": "Analyze Prices",     "type": "main", "index": 0 }]] },
-    "Analyze Prices":     { "main": [[{ "node": "Has Alert?",         "type": "main", "index": 0 }]] },
-    "Has Alert?":         { "main": [
+    "Schedule Trigger":      { "main": [[{ "node": "Set Crypto Params",       "type": "main", "index": 0 }]] },
+    "Set Crypto Params":     { "main": [[{ "node": "Fetch CoinGecko Prices",  "type": "main", "index": 0 }]] },
+    "Fetch CoinGecko Prices":{ "main": [[{ "node": "Extract Items",           "type": "main", "index": 0 }]] },
+    "Extract Items":         { "main": [[{ "node": "Analyze Prices",          "type": "main", "index": 0 }]] },
+    "Analyze Prices":        { "main": [[{ "node": "Has Alert?",              "type": "main", "index": 0 }]] },
+    "Has Alert?":            { "main": [
       [{ "node": "Send Telegram Alert", "type": "main", "index": 0 }],
       [{ "node": "No Operation",        "type": "main", "index": 0 }]
     ]}
@@ -224,5 +152,5 @@
   "staticData": null,
   "tags": [{ "id": "tag-price-monitor", "name": "price-monitor" }],
   "triggerCount": 1,
-  "versionId": "2"
+  "versionId": "3"
 }
